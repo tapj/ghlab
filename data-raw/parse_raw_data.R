@@ -126,6 +126,7 @@ Dosage_proteine_AGX %>% slice(seq(3,36,3)) %>% filter(!is.na(`3`)) %>%
 ) %>% mutate(variable = variable %>% as.character %>% as.numeric()) %>%
   rename(Days = variable, `Protein (µg/µL)` = value)   -> Protein_assays
 
+devtools::use_data(Protein_assays)
 
 
 ggplot(Protein_assays,aes(y=`Protein (µg/µL)`,x=Days)) +
@@ -155,13 +156,28 @@ cinetique_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
 
 
 
+cinetique_AGX %<>%
+  slice(1:210) #%>%
+  #tidyr::separate(`Time (min)`, c("d","time"), sep=" ")
+
+#cinetique_AGX$time = lubridate::hms(cinetique_AGX$ti,"%h:%m:%s",origin="1970-01-01")[1:210]
+
+#cinetique_AGX$time %<>% lubridate::parse_date_time("HMS")
+
+#cinetique_AGX$time %<>% lubridate::hms("%h:%m:%s")[1:210]
+
+#cinetique_AGX = cinetique_AGX[, -c(1)]
+
+cinetique_AGX %<>%
+  melt(id.vars="Time (min)") %>%
+  as_tibble() %>%
+  tidyr::separate(variable, c("Run","Step"), sep="-") %>%
+  mutate(`Time (min)` = `Time (min)` - seconds(7))
 
 
+ggplot(cinetique_AGX %>% group_by(Run,Step) %>% mutate(value=sort(value)), aes(x=`Time (min)` ,y=value)) + geom_point() + facet_grid(Run~Step)
 
-
-
-
-
+#devtools::use_data(cinetique_AGX)
 
 
 
