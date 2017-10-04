@@ -48,10 +48,11 @@ DO_croissance_LLG %>%
 
 DO_croissance_AGX %>% melt
 
-) %>% rename(Substrate = Substrat, Day = variable, DO = value) -> DO_substrate
+) %>% rename(Substrate = Substrat, Day = variable, DO = value) %>%
+  mutate(Substrate = gsub("B-glycan","beta-Glucan",Substrate)) -> DO_substrate
 
 
-devtools::use_data(DO_substrate)
+devtools::use_data(DO_substrate, overwrite = TRUE)
 
 # Protein
 
@@ -67,6 +68,75 @@ Dosage_proteine_ARS <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
 Dosage_proteine_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
                                   sheet = "Dosage proteine AGX bis", skip = 1)
 
+
+
+colnames(Dosage_Proteine_CXP)[1:2] = c("assays",0)
+
+colnames(Dosage_proteine_LLG)[1] = colnames(Dosage_proteine_ARS)[1] = colnames(Dosage_proteine_AGX)[1] = c("assays")
+
+Dosage_proteine_LLG$`0` = Dosage_proteine_ARS$`0` = Dosage_proteine_AGX$`0` = 0
+
+colnames(Dosage_proteine_AGX)[12] = 38
+
+rbind(
+
+Dosage_Proteine_CXP %>%
+  filter(assays=="µg/µl") %>%
+  mutate(Substrate = c("Pectine M1","Pectine M2", "Xylan M1", "Xylan M2", "Cellulose M1", "Cellulose M2") ) %>%
+  melt(id.vars=c("Substrate","assays")) %>%
+  select(-assays) %>%
+  separate(Substrate, c("Substrate","Mix"), sep=" ") %>%
+  filter(Mix == "M2") %>%
+  select(-Mix) %>%
+  mutate(value=ifelse(variable == 0 , 0,value)) %>%
+  mutate(R=1),
+
+
+Dosage_proteine_LLG %>%
+  filter(assays=="Moyenne") %>%
+  mutate(Substrate = c("Laminarin M1","Laminarin M2", "Lichenan M1", "Lichenan M2", "beta-Glucan M1", "beta-Glucan M2", "LGG M1", "LGG M2") ) %>%
+  melt(id.vars=c("Substrate","assays")) %>%
+  select(-assays) %>%
+  separate(Substrate, c("Substrate","Mix"), sep=" ") %>%
+  filter(Mix == "M2") %>%
+  select(-Mix) %>%
+  mutate(value=ifelse(variable == 0 , 0,value)) %>%
+  mutate(R=1),
+
+
+Dosage_proteine_ARS %>%
+  filter(assays %in% c("Moyenne","moyenne")) %>%
+  mutate(Substrate = c("Amylopectin M1","Amylopectin M2", "R_Starch M1", "R_Starch M2", "ARS M1", "ARS M2") ) %>%
+  melt(id.vars=c("Substrate","assays")) %>%
+  select(-assays) %>%
+  separate(Substrate, c("Substrate","Mix"), sep=" ") %>%
+  filter(Mix == "M2") %>%
+  select(-Mix) %>%
+  mutate(value=ifelse(variable == 0 , 0,value)) %>%
+  mutate(R=1),
+
+Dosage_proteine_AGX %>% slice(seq(3,36,3)) %>% filter(!is.na(`3`)) %>%
+  mutate(Substrate = sort(paste(paste0("AGX-",1:3),sort(rep(1:3,3))))) %>%
+  select(-`Volume µl`) %>%
+  melt(id.vars=c("Substrate","assays")) %>%
+  select(-assays) %>%
+  separate(Substrate, c("Substrate","R"), sep=" ") %>%
+  filter(variable != 38)
+
+) %>% mutate(variable = variable %>% as.character %>% as.numeric()) %>%
+  rename(Days = variable, `Protein (µg/µL)` = value)   -> Protein_assays
+
+
+
+ggplot(Protein_assays,aes(y=`Protein (µg/µL)`,x=Days)) +
+  geom_point() +
+  facet_wrap(~Substrate,scales = "free") +
+  geom_smooth() #+
+  #ylim(0,NA)
+
+
+
+
 #Lactate Acetate
 
 # Production_lactate_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
@@ -81,6 +151,23 @@ Dosage_proteine_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
 
 cinetique_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
                             sheet = "cinetique continu AGX bis")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
