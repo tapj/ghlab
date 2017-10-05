@@ -139,6 +139,21 @@ AGX_kinetics %>%
 
 data("AGX_SCFA")
 
+AGX_SCFA %>%
+  ggplot() + geom_line(aes(x=Step, y=value, group=Run)) + facet_wrap(~SCFA, scale="free_y")
+
+
+
+AGX_SCFA %>%
+  group_by(Subtract,Run,Step,SCFA) %>%
+  summarise(value=mean(value)) %>%
+  dcast(Subtract+Run+Step~SCFA) %>%
+  mutate(ratio_lactate = Lactate / (Acetate+Lactate)) %>%
+  ggplot() + 
+  geom_point(aes(x=Step, y=ratio_lactate, group=Run, col=Run)) +
+  geom_line(aes(x=Step, y=ratio_lactate, group=Run, col=Run)) +
+  ylab("Lactate/\n(Lactate+Acetate)")
+
 
 
 ```
@@ -146,9 +161,11 @@ data("AGX_SCFA")
 
 
 
+## polysacharide per strain
 
 
-```{r}
+
+```{r, fig.height=7, fig.width=9}
 
 data(Strain_Substrate)
 
@@ -172,7 +189,7 @@ dd= Strain_Substrate %>%
 
 ```
 
-
+red line = negative control, empty well with medium.
 
 
 
