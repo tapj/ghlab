@@ -49,10 +49,12 @@ DO_croissance_LLG %>%
 DO_croissance_AGX %>% melt
 
 ) %>% rename(Substrate = Substrat, Day = variable, DO = value) %>%
-  mutate(Substrate = gsub("B-glycan","beta-Glucan",Substrate)) -> DO_substrate
+  mutate(Substrate = gsub("B-glycan","beta-Glucan",Substrate),
+         Day = Day %>% as.character %>% as.numeric ) -> DO_substrate
 
 
 devtools::use_data(DO_substrate, overwrite = TRUE)
+
 
 # Protein
 
@@ -129,61 +131,86 @@ Dosage_proteine_AGX %>% slice(seq(3,36,3)) %>% filter(!is.na(`3`)) %>%
 devtools::use_data(Protein_assays)
 
 
-ggplot(Protein_assays,aes(y=`Protein (µg/µL)`,x=Days)) +
-  geom_point() +
-  facet_wrap(~Substrate,scales = "free") +
-  geom_smooth() #+
-  #ylim(0,NA)
+
+# Cinetique AGX
+
+Cinetique_AGX1 <- read_excel("data-raw/Cinetique en continu AGX bis.xlsx",
+                            sheet = "AGX 1")
+
+Cinetique_AGX2 <- read_excel("data-raw/Cinetique en continu AGX bis.xlsx",
+                             sheet = "AGX 2")
+
+Cinetique_AGX3 <- read_excel("data-raw/Cinetique en continu AGX bis.xlsx",
+                             sheet = "AGX 3")
+
+
+colnames(Cinetique_AGX1)[-1] = paste0(colnames(Cinetique_AGX1)[-1],sort(rep(c("-R1","-R2","-R3"),9)))
+
+colnames(Cinetique_AGX2)[-1] = paste0(colnames(Cinetique_AGX2)[-1],sort(rep(c("-R1","-R2","-R3"),9)))
+
+colnames(Cinetique_AGX3)[-1] = paste0(colnames(Cinetique_AGX3)[-1],sort(rep(c("-R1","-R2","-R3"),9)))
+
+
+rbind(
+  Cinetique_AGX1 %>% melt(id.vars="600") %>% na.omit %>% as_tibble(),
+  Cinetique_AGX2 %>% melt(id.vars="600") %>% na.omit %>% as_tibble(),
+  Cinetique_AGX3 %>% melt(id.vars="600") %>% na.omit %>% as_tibble()
+) %>%  separate(variable, c("Run","Step", "Replicate"), sep="-") %>%
+  rename(Time = `600`, DO = value) -> AGX_kinetics
+
+
+devtools::use_data(AGX_kinetics)
 
 
 
+# polysacharides assays
 
-#Lactate Acetate
+Code <- read_excel("data-raw/Code souches DR INRA ABG 12092017.xlsx")
 
-# Production_lactate_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
-#                                      sheet = "Production lactate AGX bix",
-#                                      skip = 1)
-#
-# Production_acetate_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
-#                                      sheet = "Production acetate AGX bis",
-#                                      skip = 1)[1:10]
+Code %<>% rename(Code_1 = `code Audrey`, Strain_id = `Code publication`, Code = `Souche `)
 
-# cinetique
-
-cinetique_AGX <- read_excel("data-raw/Bilan GH_Lab 2017.xlsx",
-                            sheet = "cinetique continu AGX bis")
-
-
-
-
-cinetique_AGX %<>%
-  slice(1:210) #%>%
-  #tidyr::separate(`Time (min)`, c("d","time"), sep=" ")
-
-#cinetique_AGX$time = lubridate::hms(cinetique_AGX$ti,"%h:%m:%s",origin="1970-01-01")[1:210]
-
-#cinetique_AGX$time %<>% lubridate::parse_date_time("HMS")
-
-#cinetique_AGX$time %<>% lubridate::hms("%h:%m:%s")[1:210]
-
-#cinetique_AGX = cinetique_AGX[, -c(1)]
-
-cinetique_AGX %<>%
-  melt(id.vars="Time (min)") %>%
-  as_tibble() %>%
-  tidyr::separate(variable, c("Run","Step"), sep="-") %>%
-  mutate(`Time (min)` = `Time (min)` - seconds(7))
-
-
-ggplot(cinetique_AGX %>% group_by(Run,Step) %>% mutate(value=sort(value)), aes(x=`Time (min)` ,y=value)) + geom_point() + facet_grid(Run~Step)
-
-#devtools::use_data(cinetique_AGX)
+substrate =
+  c(
+  c("Cellulose","Xylane","Pectin",
+    "ArabinoG","Galactomannane","Xyloglucan",
+    "Laminarin","Lichenan","b-glucan",
+    "Amylopectin") %>% paste(.,c("S1")),
+  c("Cellulose","Xylane","Pectin",
+    "ArabinoG","Galactomannane","Xyloglucan",
+    "Laminarin","Lichenan","b-glucan",
+    "Amylopectin") %>% paste(.,c("S2"))
+  ) %>% sort
 
 
 
+Strain_Substrate = NULL
+
+for(i in substrate){
 
 
+dd <- read_excel("data-raw/Polysaccharides 16-20 juin 2014.xls",
+                           sheet = i, skip = 1)[2:10,]
 
+colnames(dd) =  dd %>% colnames %>% gsub("^$","Empty",.) %>% ifelse(is.na(.),"Empty", .) %>% paste(.,1:length(colnames(dd)), sep="__")
 
+colnames(dd)[1] = "Time"
+
+dd %<>%
+  melt(id.vars="Time") %>%
+  rename(Well=variable,
+         DO=value) %>%
+  separate(Well, c("Strain","id"), sep="__", remove = FALSE) %>%
+  select(-id) %>%
+  mutate(S = i,
+         Time = Time %>% as.numeric,
+         DO = DO %>% as.numeric) %>%
+  separate(S, c("Substrate","Plate"), sep=" ") %>%
+  as_tibble()
+
+Strain_Substrate = rbind(Strain_Substrate,dd)
+
+}
+
+devtools::use_data(Strain_Substrate, overwrite = TRUE)
 
 
