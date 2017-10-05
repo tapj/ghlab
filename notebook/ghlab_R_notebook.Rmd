@@ -1,0 +1,178 @@
+---
+title: "GHLAB R Notebook"
+output:
+  html_notebook: 
+    highlight: tango
+    author: Julien Tap
+    mathjax: null
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+    code_folding: hide
+  html_document: default
+---
+
+```{r}
+
+devtools::load_all()
+library(tidyverse)
+library(reshape2)
+
+```
+
+
+## DO per subtrate
+
+```{r}
+
+
+data("DO_substrate")
+ggplot(DO_substrate) +
+  geom_point(aes(x=Day, y=DO)) +
+  geom_smooth(aes(x=Day, y=DO), se=FALSE) +
+  facet_wrap(~Substrate, scale="free_y")
+
+
+
+
+```
+
+
+
+## Protein assays
+
+```{r}
+
+data("Protein_assays")
+
+ggplot(Protein_assays,aes(y=`Protein (µg/µL)`,x=Days)) +
+  geom_point() +
+  facet_wrap(~Substrate,scales = "free") +
+  geom_smooth(se=FALSE) #+
+  #ylim(0,NA)
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+## AGX kinetics
+
+
+```{r}
+
+data("AGX_kinetics")
+AGX_kinetics %>%
+  filter(!(
+    Step == "T3" & Run=="AGX1" & Replicate == "R3"|
+    Step == "T4" & Run=="AGX1" & Replicate == "R1"|
+    Step == "T8" & Run=="AGX1" & Replicate == "R3"|
+    Step == "T9" & Run=="AGX1" & Replicate == "R1"|
+    Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+    Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+    Step == "T5" & Run=="AGX2" & Replicate == "R2"|
+    Step == "T1" & Run=="AGX3" & Replicate == "R1"|
+    Step == "T2" & Run=="AGX3" & Replicate == "R3"|
+    Step == "T3" & Run=="AGX3" & Replicate == "R3"
+
+  )) %>%
+
+
+  mutate(Duration = as.numeric(Time) + abs(min(as.numeric(Time)))) %>%
+  group_by(Run,Step,Replicate) %>%
+  mutate(DO = DO - min(DO)) %>%
+  ggplot(aes(x=Duration ,y=DO)) +
+  #geom_point(aes(group=Replicate, col=Replicate), cex=0.1) +
+  geom_point(cex=0.01, alpha=0.01) +
+  geom_smooth() +
+  facet_grid(Run~Step) +
+  scale_x_continuous("Duration (h)",breaks = c(0,24*3600,48*3600,72*3600), labels=c("0","24","48","72"))
+
+
+
+
+
+AGX_kinetics %>%
+  filter(!(
+    Step == "T3" & Run=="AGX1" & Replicate == "R3"|
+      Step == "T4" & Run=="AGX1" & Replicate == "R1"|
+      Step == "T8" & Run=="AGX1" & Replicate == "R3"|
+      Step == "T9" & Run=="AGX1" & Replicate == "R1"|
+      Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+      Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+      Step == "T5" & Run=="AGX2" & Replicate == "R2"|
+      Step == "T1" & Run=="AGX3" & Replicate == "R1"|
+      Step == "T2" & Run=="AGX3" & Replicate == "R3"|
+      Step == "T3" & Run=="AGX3" & Replicate == "R3"
+
+  )) %>%
+
+
+  mutate(Duration = as.numeric(Time) + abs(min(as.numeric(Time)))) %>%
+  group_by(Run,Step,Duration) %>%
+  summarise(DO = mean(DO)) %>%
+  ungroup() %>%
+  group_by(Run,Step) %>%
+  mutate(DO = DO - min(DO)) %>%
+  summarise(AUC = MESS::auc(Duration/3600,DO)) %>%
+  ggplot(aes(y=AUC,x=Step)) +
+  geom_point(aes(group=Run, color=Run)) +
+  geom_smooth(aes(group=Run, color=Run), se = FALSE)
+
+```
+
+
+
+## AGX SCFA
+
+
+
+```{r}
+
+data("AGX_SCFA")
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
+data(Strain_Substrate)
+
+#ggplot(Strain_Substrate %>% filter(Strain == "Empty")) + geom_point(aes(x=Time,y=DO)) + facet_wrap(~Substrate+Plate)
+#ggplot(Strain_Substrate %>% filter(Strain != "Empty")) + geom_point(aes(x=Time,y=DO)) + facet_wrap(~Substrate+Plate)
+
+
+dd= Strain_Substrate %>%
+  group_by(Well,Strain,Substrate,Plate) %>%
+  mutate(DO = DO - min(DO)) %>%
+  ungroup()
+
+  ggplot(dd %>% filter(Strain != "Empty") ) +
+  geom_line(aes(x=Time,y=DO, group=Strain)) +
+  geom_smooth(data=dd %>% filter(Strain == "Empty") %>% group_by(Substrate,Time, Plate) %>% summarise(DO = quantile(DO,0.95)), aes(x=Time,y=DO), col="red", se=F) +
+  facet_wrap(~Substrate+Plate, scale="free_y") +
+    ylab("DO - min(DO)")
+
+
+
+
+```
+
+
+
+
+
