@@ -130,6 +130,72 @@ AGX_kinetics %>%
 ```
 
 
+### growth rate per step
+
+```{r}
+
+library(growthcurve)
+
+AGX_kinetics %>%
+  filter(!(
+    Step == "T3" & Run=="AGX1" & Replicate == "R3"|
+    Step == "T4" & Run=="AGX1" & Replicate == "R1"|
+    Step == "T8" & Run=="AGX1" & Replicate == "R3"|
+    Step == "T9" & Run=="AGX1" & Replicate == "R1"|
+    Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+    Step == "T3" & Run=="AGX2" & Replicate == "R1"|
+    Step == "T5" & Run=="AGX2" & Replicate == "R2"|
+    Step == "T1" & Run=="AGX3" & Replicate == "R1"|
+    Step == "T2" & Run=="AGX3" & Replicate == "R3"|
+    Step == "T3" & Run=="AGX3" & Replicate == "R3"
+
+  )) %>%
+
+  mutate(Duration = as.numeric(Time) + abs(min(as.numeric(Time)))) %>%
+  group_by(Run,Step,Replicate) %>%
+  mutate(DO = log(DO / min(DO))) %>%
+  ungroup() %>%
+  group_by(Run,Step,Duration) %>%
+  summarise(DO = mean(DO)+10^-6) %>%
+  ungroup() %>%
+  group_by(Run,Step) %>%
+  #filter(Step %in% c("T2"), Run=="AGX1") %>%
+  mutate(growth_rate_h  = fit_growth(., Duration, DO) %>% .$parameters %>% .$max_rate %>% .$rate*3600,
+            growth_rate_s  = fit_growth(., Duration, DO) %>% .$parameters %>% .$max_rate %>% .$rate,
+            growth_value_s = fit_growth(., Duration, DO) %>% .$parameters %>% .$max_rate %>% .$value,
+            growth_time_s  = fit_growth(., Duration, DO) %>% .$parameters %>% .$max_rate %>% .$time
+            ) %>% 
+  mutate(icept = growth_value_s - (growth_time_s * growth_rate_s)) -> AGX_growth
+
+
+
+AGX_growth %>%
+  ggplot(aes(x=Duration ,y=DO)) +
+  #geom_point(aes(group=Replicate, col=Replicate), cex=0.1) +
+  geom_line(cex=0.01, alpha=0.80) +
+  #geom_smooth() +
+  facet_grid(Run~Step) +
+  scale_x_continuous("Duration (h)",breaks = c(0,24*3600,48*3600,72*3600), labels=c("0","24","48","72")) +
+  scale_y_continuous("ln(DO/DO[0])") +
+  geom_abline(aes(intercept=icept, slope=growth_rate_s), col="blue")
+
+
+AGX_growth %>%
+  group_by(Run, Step) %>%
+  summarise(growth_rate_h = max(growth_rate_h)) %>%
+   ggplot(aes(y=growth_rate_h,x=Step)) +
+   geom_point(aes(group=Run, color=Run)) +
+   geom_smooth(aes(group=Run, color=Run), se = FALSE)
+ 
+ 
+
+
+
+
+```
+
+
+
 
 ## AGX SCFA
 
