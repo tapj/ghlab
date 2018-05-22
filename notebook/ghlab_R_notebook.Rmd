@@ -259,3 +259,84 @@ red line = negative control, empty well with medium.
 
 
 
+# Cogam and SCFA
+
+
+
+
+
+```{r, fig.height=7, fig.width=6}
+
+data(cogam)
+
+cogam %>%
+  filter(Time != 4) %>%
+  ggplot() + 
+  geom_line(aes(x=Time,y=value,group=Group, col=Group)) + 
+  geom_point(aes(x=Time,y=value,group=Group, col=Group)) +
+  facet_grid(SCFA~run, scale="free") +
+  ylab("SCFA (mmol/L)") + xlab("Time (h)")
+  
+  
+
+```
+
+
+```{r}
+
+cogam %>%
+  filter(Time != 4) %>%
+  dcast(SCFA+run+Time~Group) %>%
+  mutate(delta=(`Fibres+Souches`+0.001)/ (Fibres+0.001)) %>%
+  ggplot() + 
+  geom_line(aes(x=Time,y=delta, group=run,col=run)) + 
+  geom_point(aes(x=Time,y=delta, group=run,col=run)) +
+  facet_wrap(~SCFA, scale="free") +
+  scale_y_continuous(labels = scales::percent) +
+  ylab("ratio(+Strain)") + xlab("Time (h)")
+
+
+cogam %>%
+  filter(Time != 4) %>%
+  dcast(SCFA+run+Time~Group) %>%
+  mutate(delta=(`Fibres+Souches`+0.001) - (Fibres+0.001)) %>%
+  ggplot() + 
+  geom_line(aes(x=Time,y=delta, group=run,col=run)) + 
+  geom_point(aes(x=Time,y=delta, group=run,col=run)) +
+  facet_wrap(~SCFA, scale="free") +
+  #scale_y_continuous(labels = scales::percent) +
+  ylab("delta(+Strain)(mmol/L)") + xlab("Time (h)")
+
+
+```
+
+
+
+```{r, fig.height=3, fig.width=6}
+
+cogam %>%
+  filter(Time != 4, SCFA %in% c("butyrate","lactate")) %>%
+  dcast(SCFA+run+Time~Group) %>%
+  mutate(delta=(`Fibres+Souches`+0.001) - (Fibres+0.001)) %>%
+  ggplot() + 
+  geom_line(aes(x=Time,y=delta, group=SCFA,col=SCFA)) + 
+  geom_point(aes(x=Time,y=delta, group=SCFA,col=SCFA)) +
+  facet_wrap(~run) +
+  #scale_y_continuous(labels = scales::percent) +
+  ylab("delta(+Strain)(mmol/L)") + xlab("Time (h)")
+
+
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
