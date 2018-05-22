@@ -214,3 +214,37 @@ Strain_Substrate = rbind(Strain_Substrate,dd)
 devtools::use_data(Strain_Substrate, overwrite = TRUE)
 
 
+
+
+### import cogam data ####
+
+
+cogam <- read_excel("data-raw/Compilation SCFA CoGAM.xlsx", sheet = 2)[1:10]
+
+cogam %>% mutate(
+  run = date %>%
+    as.character() %>%
+    as.factor %>%
+    forcats::fct_recode(run1 = "2015-12-03", run2 = "2016-02-03")
+  ) -> cogam
+
+
+cogam %>%
+  mutate(`Temps (h)` = gsub("[[:space:]]","", cogam$`Temps (h)`)) %>%
+  select(-date) %>%
+  melt(id.vars=c("mmol/l","Temps (h)","run")) %>%
+  mutate(value=value %>% as.numeric) %>%
+  mutate(variable = variable %>% as.character %>% as.integer) %>%
+  rename(Group="Temps (h)", Time="variable", SCFA = "mmol/l") %>%
+  as.tibble -> cogam
+
+devtools::use_data(cogam, overwrite = TRUE)
+
+
+
+
+
+
+
+
+
