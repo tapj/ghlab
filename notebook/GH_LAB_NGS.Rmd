@@ -292,6 +292,8 @@ dev.off()
 ```
 
 
+select specific genes for each genomes
+
 ```{r}
 #> table(A_sum>0, !is.na(mapping_tax$phylum))
 #
@@ -384,6 +386,8 @@ scale_y_log10("Amy M2 T08" ) + scale_x_log10("AGX−3 M2 T08") #+
 ```
 
 
+function to plot specific genes
+
 ```{r}
 specific_genes_plot = function(X,Y, check.noise=TRUE, noise_cut=10^-6, noise_input=10^-8, limits=c(5*10^-7,5*10^-4), color=TRUE ) {
 
@@ -421,6 +425,7 @@ if(color){
 }
 ```
 
+genererate plot and export PDF
 
 ```{r}
 #specific_genes_plot(X,Y)
@@ -468,8 +473,8 @@ dev.off()
 
 ```
 
-
-```{r}
+an example of scatter plot with 4 strains selected using two substrates
+```{r message=FALSE, warning=FALSE}
 
 mapping_tax_specific %>% select("ARS_M2_T08", "AGX3_M2_T08", genomes_tax) %>%
   filter(genomes_tax %in% c("Lpp230","Bbr32", "Lr108","Lmu15")) %>%
@@ -479,4 +484,98 @@ mapping_tax_specific %>% select("ARS_M2_T08", "AGX3_M2_T08", genomes_tax) %>%
   scale_x_log10(limits=c(5*10^-8,5*10^-4))
 
 ```
+
+
+## CAZy vs Genomes analysis
+
+
+```{r}
+
+
+
+
+
+genomes_df = data.frame(genes_id=mapping_tax$genes_id, mapping_tax[,c(55:59,61:140)])
+
+genomes_cazy = merge(cazy,genomes_df, by="genes_id", all.x=TRUE)
+genomes_cazy = na.omit(apply(genomes_cazy[,7:91] %>% select(-species_clean, -genus_clean, -GHlab), 2, tapply, genomes_cazy$Family, sum))
+
+genomes_cazy.pca = dudi.pca(as.data.frame(t(genomes_cazy)), scannf=F, nf=3)
+
+
+samples_genomes.pca = dudi.pca(log10(samples_genomes_abund[row.names(genomes_cazy.pca$li),-c(5,14,17,28)]+10^-7), scannf=F, nf=3)
+
+
+
+samples_cazy.coi =  coinertia(samples_genomes.pca, genomes_cazy.pca, scannf=F, nf=3)
+
+plot(samples_cazy.coi)
+randtest(samples_cazy.coi)
+
+
+
+
+
+```
+
+## strain dynamic over time by substrat
+
+select strain having at least a rel. abundance > 10^-5 in one condition
+
+```{r}
+
+
+samples_genomes_abund_select =  samples_genomes_abund[apply(samples_genomes_abund, 1, max) > 10^-5,]
+
+samples_genomes_metadata =  merge(t(samples_genomes_abund_select), genes.nb.metadata, by="row.names")
+
+samples_genomes_metadata_melt = melt(samples_genomes_metadata, id.vars=c("genes.nb","Substrat","Souches","Time","Row.names"))
+
+ggplot(samples_genomes_metadata_melt) + geom_point(aes(x=Time, y=value, color=variable, shape=Souches)) +
+facet_grid(variable~Substrat, scale="free_y") + theme_bw() + theme(axis.text.x=element_text(size=5),  axis.text.y=element_text(size=5) )
+
+pdf("figures/genomes_substrat_dynamics.pdf", w=10, h=8)
+ggplot(samples_genomes_metadata_melt) + geom_point(aes(x=Time, y=value, color=variable, shape=Souches)) +
+facet_grid(variable~Substrat, scale="free_y") + theme_bw() + theme(axis.text.x=element_text(size=5),  axis.text.y=element_text(size=5) )
+
+dev.off()
+
+
+
+```
+
+
+## Pangenomes global
+
+```{r fig.height=6, fig.width=16}
+idx = apply(genomes_df[,-1] %>% select(-species_clean , -genus_clean),1,sum) > 0
+
+pangenomes = genomes_df[idx, ]
+
+
+sp2.lr.nr100    = vegan::specaccum(t(pangenomes[,grep("Lr",  colnames(pangenomes))]), "random")
+sp2.lpp.nr100   = vegan::specaccum(t(pangenomes[,grep("Lpp", colnames(pangenomes))]), "random")
+```
+
+
+```{r fig.height=6, fig.width=16}
+par(mfrow=c(1,2))
+
+boxplot(t(sp2.lr.nr100$perm),col="yellow",  pch="+", ylab="Number of genes", xlab="number of genomes", main="lr NR100" )
+
+boxplot(t(sp2.lpp.nr100$perm),col="lightblue",  pch="+", ylab="Number of genes", xlab="number of genomes", main="lpp NR100" )
+
+
+pdf("figures/pangenomes_NR100.pdf", w=16, h=6)
+
+par(mfrow=c(1,2))
+
+boxplot(t(sp2.lr.nr100$perm),col="yellow",  pch="+", ylab="Number of genes", xlab="number of genomes", main="lr NR100" )
+
+boxplot(t(sp2.lpp.nr100$perm),col="lightblue",  pch="+", ylab="Number of genes", xlab="number of genomes", main="lpp NR100" )
+
+dev.off()
+```
+
+
 
