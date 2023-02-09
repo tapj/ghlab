@@ -3,7 +3,12 @@ title: "GH LAB NGS Analysis"
 output: html_notebook
 ---
 
-```{r}
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(foreach)
+library(ggplot2)
+
+
 ```
 
 
@@ -12,6 +17,9 @@ data("mapping")
 data("cazy")
 data("nr100.genes")
 data("metadata_ngs")
+data("tax")
+
+
 ```
 
 ```{r}
@@ -128,6 +136,7 @@ dev.off()
 
 ## taxonomy
 
+for each genes, a taxonomic association was done using BLAST
 
 ```{r}
 #tax
@@ -213,6 +222,261 @@ p_pectin_agx_species
 dev.off()
 ```
 
+## genomes
 
 
+```{r eval=FALSE, include=FALSE}
+#Genomes based analysis
+library(doParallel)
+registerDoParallel(cores=4)
+
+
+genomes_names = names(mapping_tax[,55:140][,-6])
+
+
+foreach( i = 1:length(genomes_names)) %dopar% {
+
+library(ggplot2)  
+  
+g_name = genomes_names[i]
+
+
+g = mapping_tax[,g_name] > 0
+
+p_pectin_agx_genomes =
+ggplot(cbind(mapping_tax,g), aes(x=Pec_M2_T08, y=AGX3_M2_T08) ) + geom_point(aes(color=g), alpha=0.2) +  scale_color_discrete(g_name) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001)) +
+guides(col = guide_legend(ncol = 2))
+
+#ggsave(paste0("figures/test/pectin_agx_v2_genomes_",g_name,".png"), p_pectin_agx_genomes)
+
+png(paste0("figures/test/pectin_agx_v2_genomes_",g_name,".png"))
+
+print(p_pectin_agx_genomes)
+
+dev.off()
+
+
+}
+```
+
+
+```{r eval=FALSE, include=FALSE}
+genomes_names = names(mapping_tax[,55:140][,-6])
+
+foreach( i = 60:length(genomes_names)) %dopar% {
+
+  library(ggplot2)  
+  
+  
+g_name = genomes_names[i]
+
+
+g = mapping_tax[,g_name] > 0
+
+p_pectin_agx_genomes =
+ggplot(cbind(mapping_tax,g), aes(x=Pec_M2_T08, y=AGX3_M2_T08) ) + geom_point(aes(color=g), alpha=0.2) +  scale_color_discrete(g_name) +
+scale_y_log10("Pectin M2 T08" ) + scale_x_log10("AGX−3 M2 T08") +
+guides(col = guide_legend(ncol = 2))
+
+#ggsave(paste0("figures/test/pectin_agx_v2_genomes_",g_name,".png"), p_pectin_agx_genomes)
+
+png(paste0("figures/test2/pectin_agx_v2_genomes_",g_name,".png"))
+
+print(p_pectin_agx_genomes)
+
+dev.off()
+
+
+}
+```
+
+
+```{r}
+#> table(A_sum>0, !is.na(mapping_tax$phylum))
+#
+#         FALSE   TRUE
+#  FALSE  52786 361767
+#  TRUE    5364 102020
+
+
+
+## binarise relevant taxonomic information
+
+mapping_tax$Pediococcus = 0
+mapping_tax$Pediococcus[which(mapping_tax$genus=="Pediococcus")] <-1
+
+
+mapping_tax$Leuconostoc = 0
+mapping_tax$Leuconostoc[which(mapping_tax$genus=="Leuconostoc")] <-1
+
+
+mapping_tax$Ljohnsonii = 0
+mapping_tax$Ljohnsonii[which(mapping_tax$species=="Lactobacillus johnsonii")] <-1
+
+
+mapping_tax$Lbrevis = 0
+mapping_tax$Lbrevis[which(mapping_tax$species=="Lactobacillus brevis")] <-1
+
+
+mapping_tax$Lfermentum = 0
+mapping_tax$Lfermentum[which(mapping_tax$species=="Lactobacillus fermentum")] <-1
+
+mapping_tax$Lgasseri = 0
+mapping_tax$Lgasseri[which(mapping_tax$species=="Lactobacillus gasseri")] <-1
+
+
+mapping_tax$Ldelbrueckii = 0
+mapping_tax$Ldelbrueckii[which(mapping_tax$species=="Lactobacillus delbrueckii")] <-1
+
+
+
+mapping_tax$genomes_prev = apply(mapping_tax[, c(53:147)] %>% select(-species_clean, -genus_clean, -GHlab), 1, sum)
+
+
+
+#sum(table(mapping_tax$genus[mapping_tax$genomes_prev > 0 & mapping_tax$genomes_prev < 10]))
+
+#mapping_tax$genomes_prev[mapping_tax$Leuconostoc==1]
+
+
+
+sort(apply(mapping_tax[mapping_tax$genomes_prev == 1,c(55:147)] %>% select(-species_clean, -genus_clean, -GHlab), 2, sum))
+
+par(mfrow=c(1,2))
+
+hist(log10(mapping_tax$AGX3_M2_T08[which(mapping_tax$Lr47 !=0 &mapping_tax$genomes_prev == 1 )]), main="specific genes Lr47")
+hist(log10(mapping_tax$AGX3_M2_T08[which(mapping_tax$Lr47 !=0  )]), main="all genes Lr47")
+
+
+## summarize gene mapping by specific genes
+
+mapping_tax_specific = mapping_tax[mapping_tax$genomes_prev == 1,]
+
+
+genomes_spec = mapping_tax_specific[,c(53:147)]%>% select(-species_clean, -genus_clean, -GHlab)
+
+
+mapping_tax_specific$genomes_tax =  names(genomes_spec)[apply(genomes_spec  , 1, function(x){ which(x != 0)  } )]
+
+
+
+samples_genomes_abund = apply(mapping_tax_specific[1:35] , 2, tapply, mapping_tax_specific$genomes_tax, median)
+
+#genomes.pca = dudi.pca(as.data.frame(t(samples_genomes_abund)) , scannf=F, nf=3)
+
+genomes.pca = dudi.pca(as.data.frame(t(samples_genomes_abund[,-c(5,14,17,28)])) , scannf=F, nf=3)
+
+scatter(genomes.pca)
+
+
+p_amy_agx_genomes =
+ggplot(mapping_tax) + geom_point(aes(x=Amy_M2_T08, y=AGX3_M2_T08, color=as.character(genus_clean)), alpha=0.2) +
+scale_y_log10("Amy M2 T08" ) + scale_x_log10("AGX−3 M2 T08") #+
+#guides(col = guide_legend(ncol = 2))
+
+#genomes.pca = dudi.pca(as.data.frame(t(log10(samples_genomes_abund[,-c(5,14,17,28)] + 10^-8 ))) , scannf=F, nf=3)
+
+
+#X= "Amy_M2_T08"
+
+#Y= "AGX3_M2_T08"
+```
+
+
+```{r}
+specific_genes_plot = function(X,Y, check.noise=TRUE, noise_cut=10^-6, noise_input=10^-8, limits=c(5*10^-7,5*10^-4), color=TRUE ) {
+
+  tmp   = data.frame(X = mapping_tax_specific[,X], Y=mapping_tax_specific[,Y], genomes_tax=mapping_tax_specific$genomes_tax)
+  tmp_2 = data.frame(X = samples_genomes_abund[,X], Y = samples_genomes_abund[,Y], genomes_label= rownames(samples_genomes_abund))
+
+  if(check.noise) {
+
+    X_idx = which(tmp$X < noise_cut)
+    Y_idx = which(tmp$Y < noise_cut)
+
+    ni = log10(noise_input)
+
+    tmp$X[X_idx] = 10^(rnorm(length(X_idx),ni,0.1))
+    tmp$Y[Y_idx] = 10^(rnorm(length(Y_idx),ni,0.1))
+
+    tmp_2$X[tmp_2$X < noise_cut] = noise_input
+    tmp_2$Y[tmp_2$Y < noise_cut] = noise_input
+
+  }
+
+if(color){
+  p_specific_genes = ggplot(tmp) + geom_point(aes(x=X, y=Y, color=genomes_tax), alpha=0.2) +
+  scale_x_log10(X, limits=limits) + scale_y_log10(Y, limits=limits) +
+  guides(col = guide_legend(ncol = 4)) + geom_text(data=tmp_2, aes(x=X,y=Y, label=genomes_label )) } else {
+
+  p_specific_genes = ggplot(tmp) + geom_point(aes(x=X, y=Y), alpha=0.2) +
+  scale_x_log10(X, limits=limits) + scale_y_log10(Y, limits=limits)
+
+  }
+
+
+  print(p_specific_genes)
+
+}
+```
+
+
+```{r}
+#specific_genes_plot(X,Y)
+
+pdf("figures/compare_replicat_noise.pdf", h=7, w=12)
+
+specific_genes_plot("C_M2_T00","D_M2_T00",   check.noise=FALSE, limits=c(10^-7,5*10^-4), color=FALSE )
+specific_genes_plot("C_M2_T00","D_M2_T00",      noise_cut=10^-6, noise_input=8*10^-7, limits=c(10^-7,5*10^-4), color=FALSE )
+
+
+
+specific_genes_plot("A_M1_T00","B_M1_T00",   check.noise=FALSE, limits=c(10^-7,5*10^-4), color=FALSE )
+specific_genes_plot("A_M1_T00","B_M1_T00",      noise_cut=10^-6, noise_input=8*10^-7, limits=c(10^-7,5*10^-4), color=FALSE )
+
+
+dev.off()
+
+
+
+
+pdf("figures/specific_genes_plot.pdf", h=7, w=12)
+
+#specific_genes_plot("La_M1_T06","AGX3_M2_T05",   noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("AGX3_M2_T08","AGX2_M2_T08", noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("AGX1_M2_T08","AGX3_M2_T08", noise_cut=10^-6, noise_input=8*10^-7)
+#specific_genes_plot("C_M2_T00","D_M2_T00",       noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("La_M1_T06","La_M2_T06",     noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("bglu_M1_T06","bglu_M2_T06",  noise_cut=10^-6, noise_input=8*10^-7)
+
+
+
+dev.off()
+
+
+pdf("figures/dynamic_genes_plot.pdf", h=7, w=12)
+
+specific_genes_plot("C_M2_T00","D_M2_T00",      noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("AGX3_M2_T02","ARS_M2_T02", noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("AGX3_M2_T05","ARS_M2_T05", noise_cut=10^-6, noise_input=8*10^-7)
+specific_genes_plot("AGX3_M2_T08","ARS_M2_T08", noise_cut=10^-6, noise_input=8*10^-7)
+
+
+dev.off()
+
+
+```
+
+
+```{r}
+
+mapping_tax_specific %>% select("ARS_M2_T08", "AGX3_M2_T08", genomes_tax) %>%
+  filter(genomes_tax %in% c("Lpp230","Bbr32", "Lr108","Lmu15")) %>%
+  #slice_sample(n=1000) %>%
+  ggplot() + geom_point(aes(y=ARS_M2_T08, x=AGX3_M2_T08, color=genomes_tax), alpha=0.2) +
+  scale_y_log10(limits=c(5*10^-8,5*10^-4)) +
+  scale_x_log10(limits=c(5*10^-8,5*10^-4))
+
+```
 
