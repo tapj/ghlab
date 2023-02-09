@@ -1,0 +1,218 @@
+---
+title: "GH LAB NGS Analysis"
+output: html_notebook
+---
+
+```{r}
+```
+
+
+```{r}
+data("mapping")
+data("cazy")
+data("nr100.genes")
+data("metadata_ngs")
+```
+
+```{r}
+
+head(mapping)
+
+head(cazy)
+
+head(nr100.genes)
+
+head(metadata_ngs)
+
+
+```
+
+
+
+## CAZy
+
+compute CAZy proportion by samples and do a PCA
+
+```{r mapping}
+nr100.genes$length = as.numeric(as.character(nr100.genes$length))
+mapping.prop = prop.table(as.matrix(mapping)/nr100.genes$length,2)
+rownames(mapping.prop) = nr100.genes$genes_id
+```
+
+
+```{r}
+cazy_mapping = merge(cazy , mapping.prop, by.x="genes_id", by.y="row.names", all.x=TRUE)
+cazy_summary = apply(cazy_mapping[,-c(1:6)], 2, tapply, cazy_mapping$Family, sum)
+cazy.pca = dudi.pca(as.data.frame(t(log10(cazy_summary + 10^-8))), scannf=F, nf=3)
+cazy_pca_metadata = merge(cazy.pca$li, metadata_ngs, by="row.names", all.x=TRUE)
+```
+
+
+plot PCA results and select cazy family having the highest contribution on component
+
+```{r}
+p_cazy_richness = ggplot(cazy_pca_metadata) + geom_text(aes(x=Axis1, y=Axis2, label=paste(Substrat, Souches, Time), col= genes.nb),size=4 )
+
+idx1up   = which(cazy.pca$co[,1] > quantile(cazy.pca$co[,1], 0.975))
+idx1down = which(cazy.pca$co[,1] < quantile(cazy.pca$co[,1], 0.225))
+
+idx2up   = which(cazy.pca$co[,2] > quantile(cazy.pca$co[,2], 0.975))
+idx2down = which(cazy.pca$co[,2] < quantile(cazy.pca$co[,2], 0.225))
+
+cazy_comp = cazy.pca$co[unique(c(idx1up,idx1down,idx2up,idx2down)),]
+
+
+
+p_cazy_family_pca = ggplot(cazy_comp) + geom_text(aes(x=Comp1, y=Comp2, label=row.names(cazy_comp)))
+
+p_cazy_richness
+p_cazy_family_pca
+
+```
+export figures in PDF
+
+```{r}
+pdf("figures/cazy_pca_v2.pdf", h=7,w=11)
+p_cazy_richness
+dev.off()
+
+pdf("figures/cazy_family_pca_v2.pdf", h=7,w=11)
+p_cazy_family_pca
+dev.off()
+
+```
+
+
+```{r}
+tmp = merge(melt(cazy_summary[c("GH13"),]) , metadata_ngs, all.x=TRUE, by="row.names")
+
+p_GH13 = ggplot(tmp) + geom_bar(aes(paste(Substrat, Souches, Time, Row.names), y=value, fill=Substrat ), stat="identity")  + coord_flip() +
+          ylab("prop GH13") + xlab("")
+
+
+p_GH13_boxplot =ggplot(tmp) + geom_boxplot(aes(x=Substrat, y=value, fill=Substrat ))  + ylab("prop GH13") + xlab("")
+
+
+
+tmp = merge(melt(cazy_summary[c("GH8"),]) , metadata_ngs, all.x=TRUE, by="row.names")
+
+p_GH8 = ggplot(tmp) + geom_bar(aes(x=paste(Substrat, Souches, Time, Row.names), y=value, fill=Substrat ), stat="identity", position="dodge")  + coord_flip() +
+          ylab("prop GH8") + xlab("")
+
+
+
+p_GH8_boxplot = ggplot(tmp) + geom_boxplot(aes(x=Substrat, y=value, fill=Substrat ))  + ylab("prop GH8") + xlab("")
+
+
+p_GH13_boxplot
+p_GH8_boxplot
+
+```
+
+export figure in PDF
+
+```{r message=FALSE, warning=FALSE}
+pdf("figures/cazy_family_GH13_GH8_v2.pdf", h=7,w=15)
+grid.arrange(p_GH13, p_GH8, ncol=2)
+dev.off()
+
+
+
+
+pdf("figures/cazy_family_GH13_GH8_boxplot.pdf", h=7,w=15)
+grid.arrange(p_GH13_boxplot, p_GH8_boxplot, ncol=2)
+dev.off()
+```
+
+
+
+## taxonomy
+
+
+```{r}
+#tax
+
+idx = match(row.names(mapping.prop), tax$genes_id)
+
+#mapping_tax = merge(mapping.prop, tax, all.x=TRUE, by.x="row.names", by.y="GeneName")
+
+
+mapping_tax  = cbind(mapping.prop,tax[idx,])
+
+mapping_tax  = cbind(mapping_tax, nr100_length_cdhit_genomes)
+
+species = as.character(mapping_tax$species)
+
+species[!(mapping_tax$genus %in% c("Lactobacillus"))] <- "others"
+
+
+
+genus = as.character(mapping_tax$genus)
+
+genus[!(mapping_tax$genus %in% c("Lactobacillus","Propionibacterium","Lactococcus","Staphylococcus","Bifidobacterium","Streptococcus","Pediococcus"))] <- "others"
+
+
+mapping_tax = data.frame(mapping_tax, species_clean = species, genus_clean = genus)
+```
+
+
+```{r}
+p_pectin_agx =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08), alpha=0.2) +
+scale_y_log10("Pectin M2 T08") + scale_x_log10("AGX−3 M2 T08")
+
+
+
+p_pectin_agx_density =
+ggplot(mapping_tax) + stat_density2d(aes(x=Pec_M2_T08, y=AGX3_M2_T08, fill = ..level..), geom="polygon") +
+scale_y_log10("Pectin M2 T08") + scale_x_log10("AGX−3 M2 T08")
+
+
+p_pectin_agx_limits =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08), alpha=0.2) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001))
+
+
+p_pectin_agx_genus =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08, color=genus_clean), alpha=0.2) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001)) +
+guides(col = guide_legend(ncol = 2))
+
+
+
+p_pectin_agx_species =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08, color=species_clean), alpha=0.2) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001)) +
+guides(col = guide_legend(ncol = 2))
+
+
+
+
+p_pectin_agx_genomes =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08, color=as.character(Lmu15)), alpha=0.2) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001)) +
+guides(col = guide_legend(ncol = 2))
+
+
+
+p_pectin_agx_genomes =
+ggplot(mapping_tax) + geom_point(aes(x=Pec_M2_T08, y=AGX3_M2_T08, color=as.character(Lr47)), alpha=0.2) +
+scale_y_log10("Pectin M2 T08",limits=c(0.00001, 0.001) ) + scale_x_log10("AGX−3 M2 T08",limits=c(0.00001, 0.001)) +
+guides(col = guide_legend(ncol = 2))
+```
+
+
+
+```{r}
+pdf("figures/pectin_agx_v2.pdf", h=7,w=12)
+p_pectin_agx
+p_pectin_agx_density
+p_pectin_agx_limits
+p_pectin_agx_genus
+p_pectin_agx_species
+dev.off()
+```
+
+
+
+
